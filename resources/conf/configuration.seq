@@ -1,0 +1,5 @@
+--sequoio-configuration-file
+--correct header here
+
+migrations/tables/user.sql
+migrations/views/v_user.sql
