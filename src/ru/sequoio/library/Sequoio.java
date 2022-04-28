@@ -54,11 +54,7 @@ public class Sequoio {
     public void init() {
         Graph<Migration> migrationGraph = changelogParser.parseChangelog();
 
-        migrationApplier.init();
-        migrationGraph.getOrderedNodes().stream()
-                .map(node -> (Migration)node)
-                .forEach(migrationApplier::applyMigration);
-        migrationApplier.terminate();
+        migrationApplier.apply(migrationGraph);
     }
 
     public void setResourcesDirectory(String resourcesDirectory) {
