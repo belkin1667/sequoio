@@ -3,8 +3,7 @@ package ru.sequoio.library.domain.migration_paramters;
 public enum RunParameterValue implements ParameterValue<String> {
     ONCE("once"),
     ALWAYS("always"),
-    ONCHANGE("onchange"),
-    NEVER("never"),
+    ONCHANGE("onchange")
     ;
 
     private final String value;

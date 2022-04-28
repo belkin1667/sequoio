@@ -6,8 +6,10 @@ import java.util.Map;
 import java.util.Optional;
 
 import ru.sequoio.library.domain.graph.Node;
+import ru.sequoio.library.domain.migration_paramters.BooleanParameterValue;
 import ru.sequoio.library.domain.migration_paramters.MigrationParameter;
 import ru.sequoio.library.domain.migration_paramters.ParameterValue;
+import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
 
 /**
  * Single SQL expression
@@ -20,6 +22,8 @@ public class Migration extends Node {
     private String body;
     private Map<MigrationParameter, ParameterValue> params;
     private Map<String, String> userDefinedParams;
+    private RunStatus runStatus;
+    private MigrationLog loggedMigration;
 
     private Migration(Path path,
                      Integer naturalOrder,
@@ -44,6 +48,22 @@ public class Migration extends Node {
                         : body + ";";
     }
 
+    public RunStatus getRunStatus() {
+        return runStatus;
+    }
+
+    public void setRunStatus(RunStatus runStatus) {
+        this.runStatus = runStatus;
+    }
+
+    public MigrationLog getLoggedMigration() {
+        return loggedMigration;
+    }
+
+    public void setLoggedMigration(MigrationLog loggedMigration) {
+        this.loggedMigration = loggedMigration;
+    }
+
     @Override
     public List<String> getExplicitPreviousNodeNames() {
         return Optional.ofNullable(params.get(MigrationParameter.RUN_AFTER).getValueAsString())
@@ -58,21 +78,47 @@ public class Migration extends Node {
                 .orElse(List.of());
     }
 
+    public String getHash() {
+        return body; //todo: add hashing here
+    }
+
+    public RunParameterValue getRunModifier() {
+        return (RunParameterValue) params.get(MigrationParameter.RUN);
+    }
+
+    public String getEnvironment() {
+        return params.get(MigrationParameter.ENVIRONMENT).getValueAsString();
+    }
+
+    public Boolean getIgnored() {
+        return ((BooleanParameterValue) params.get(MigrationParameter.IGNORE)).getValue();
+    }
+
+    @Override
+    public String toString() {
+        return "Migration{" + "\n" +
+                "path=" + path + "\n" +
+                ", title=" + title + "\n" +
+                ", author=" + author + "\n" +
+                ", body=" + body + "\n" +
+                ", params=" + params + "\n" +
+                ", userDefinedParams=" + userDefinedParams + "\n" +
+                '}';
+    }
+
     public static MigrationBuilder builder() {
         return new MigrationBuilder();
     }
 
-    public String getHash() {
-        return body; //todo: add hashing here
-    }
 
     public static class MigrationBuilder {
 
         private String title;
         private String author;
-        private Map<MigrationParameter, ParameterValue> params;
-        private Map<String, String> userDefinedParams;
 
+        private Map<MigrationParameter, ParameterValue> params;
+
+        private Map<String, String> userDefinedParams;
         public MigrationBuilder header(String title,
                                        String author,
                                        Map<MigrationParameter, ParameterValue> params,
@@ -92,21 +138,6 @@ public class Migration extends Node {
             }
             return new Migration(path, naturalOrder, body, title, author, params, userDefinedParams);
         }
-    }
 
-    public String getRunModifier() {
-        return params.get(MigrationParameter.RUN).getValueAsString();
-    }
-
-    @Override
-    public String toString() {
-        return "Migration{" + "\n" +
-                    "path=" + path + "\n" +
-                    ", title=" + title + "\n" +
-                    ", author=" + author + "\n" +
-                    ", body=" + body + "\n" +
-                    ", params=" + params + "\n" +
-                    ", userDefinedParams=" + userDefinedParams + "\n" +
-                '}';
     }
 }

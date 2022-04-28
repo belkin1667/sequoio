@@ -24,12 +24,6 @@ public class MigrationParsingService {
     public static String MIGRATION_HEADER_REGEXP = "(--)(()|( ))(migration )([a-zA-Z0-9_\\- :#]+)";
     public static String MIGRATION_HEADER_REGEXP_CR = MIGRATION_HEADER_REGEXP + "(\n)";
 
-    private String environment;
-
-    public MigrationParsingService(String environment) {
-        this.environment = environment;
-    }
-
     public Stream<Migration> parseMigrations(Path path, AtomicInteger order) {
         List<String> migrationHeaders = getMigrationHeaders(path);
         if (migrationHeaders.isEmpty()) {
@@ -109,7 +103,4 @@ public class MigrationParsingService {
         }
     }
 
-    public void setEnvironment(String environment) {
-        this.environment = environment;
-    }
 }

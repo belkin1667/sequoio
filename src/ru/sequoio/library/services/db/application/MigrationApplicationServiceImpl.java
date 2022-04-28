@@ -12,7 +12,9 @@ import javax.sql.DataSource;
 
 import ru.sequoio.library.domain.Migration;
 import ru.sequoio.library.domain.MigrationLog;
+import ru.sequoio.library.domain.RunStatus;
 import ru.sequoio.library.domain.graph.Graph;
+import ru.sequoio.library.services.db.application.sieve.SieveChain;
 import ru.sequoio.library.services.db.query.QueryProvider;
 import ru.sequoio.library.utils.DBUtils;
 
@@ -29,11 +31,18 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     private QueryProvider queryProvider;
     private Map<String, MigrationLog> migrationLog;
     private int lockWaitCounter = 0;
+    private SieveChain sieve;
 
-    public MigrationApplicationServiceImpl(DataSource dataSource, String defaultSchema, QueryProvider queryProvider) {
+    public MigrationApplicationServiceImpl(
+            DataSource dataSource,
+            String defaultSchema,
+            QueryProvider queryProvider,
+            String environment
+    ) {
         this.dataSource = dataSource;
         this.defaultSchema = defaultSchema;
         this.queryProvider = queryProvider;
+        this.sieve = new SieveChain(environment);
     }
 
     private boolean executeBooleanPreparedStatement(PreparedStatement statement, String columnName) throws SQLException {
@@ -163,14 +172,45 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     }
 
     private void applyMigration(Migration migration) {
-        var loggedMigration = migrationLog.get(migration.getName());
-        if (loggedMigration.getHash().equals(migration.getHash())) {
 
+    }
+
+    private void addMigrationLog(Migration migration) {
+
+    }
+
+    private void updateMigrationLog(Migration migration) {
+
+    }
+
+    private void tryApplyMigration(Migration migration) {
+        setRunStatusAndMigrationLog(migration);
+        boolean isSifted = sieve.sift(migration);
+        if (isSifted) {
+            r(migration);
+            if (migration.getLoggedMigration() != null) {
+                updateMigrationLog(migration);
+            }
+            else {
+                addMigrationLog(migration);
+            }
+        }
+    }
+
+    private Migration setRunStatusAndMigrationLog(Migration migration) {
+        var loggedMigration = migrationLog.get(migration.getName());
+        if (loggedMigration == null) {
+            migration.setRunStatus(RunStatus.NEW);
+        }
+        else if (loggedMigration.getHash().equals(migration.getHash())) {
+            migration.setRunStatus(RunStatus.APPLIED);
         }
         else {
-
+            migration.setRunStatus(RunStatus.BODY_CHANGED);
         }
-        //todo: расписать стратегии применения миграций
+        migration.setLoggedMigration(loggedMigration);
+
+        return migration;
     }
 
     @Override
@@ -210,7 +250,7 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         try {
             migrationGraph.getOrderedNodes().stream()
                     .map(node -> (Migration) node)
-                    .forEach(this::applyMigration);
+                    .forEach(this::tryApplyMigration);
         } catch (Exception e) { //todo: удалить к чертям
             e.printStackTrace();
         }
