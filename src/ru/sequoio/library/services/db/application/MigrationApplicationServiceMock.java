@@ -3,10 +3,11 @@ package ru.sequoio.library.services.db.application;
 import javax.sql.DataSource;
 
 import ru.sequoio.library.domain.Migration;
+import ru.sequoio.library.domain.graph.Graph;
 
 public class MigrationApplicationServiceMock implements MigrationApplicationService {
 
-    public void applyMigration(Migration migration) {
+    private void applyMigration(Migration migration) {
         System.out.println("Parsed migration: " + migration.toString() + "\n");
     }
 
@@ -15,12 +16,9 @@ public class MigrationApplicationServiceMock implements MigrationApplicationServ
     public void setDataSource(DataSource dataSource) {}
 
     @Override
-    public void init() {
-        System.out.println("Init!");
-    }
-
-    @Override
-    public void terminate() {
-        System.out.println("Terminate!");
+    public void apply(Graph<Migration> migrationGraph) {
+        migrationGraph.getOrderedNodes().stream()
+                .map(node -> (Migration)node)
+                .forEach(this::applyMigration);
     }
 }

@@ -3,17 +3,17 @@ package ru.sequoio.library.services.db.query;
 public interface QueryProvider {
 
     // Log queries
-    String getTableExistsQuery(String schemaName, String tableName);
+    String getTableExistsPreparedQuery();
     String getCreateMigrationLogQuery();
-    String getMigrationLogQuery();
+    String getMigrationLogPreparedQuery(String migrationLogTableName);
 
     // Lock queries
     String getMigrationLogLockExistsQuery();
     String getCreateMigrationLogLockQuery();
-    String getReleaseLockQuery();
-    String getAcquireLockQuery();
-    String getIsLockedQuery();
-    String tryAcquireLockQuery();
+    String getReleaseLockPreparedQuery(String migrationLogLockTableName);
+    String getAcquireLockPreparedQuery(String migrationLogLockTableName);
+    String getIsLockedPreparedQuery(String migrationLogLockTableName);
+    String tryAcquireLockPreparedQuery();
 
-    String getCreateMigrationLogAndMigrationLogLockQuery();
+    String getCreateMigrationLogAndMigrationLogLockQuery(String migrationLogTableName, String migrationLogLockTableName);
 }

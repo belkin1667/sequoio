@@ -11,7 +11,7 @@ public class MigrationLog {
     private String name;
     private String filename;
     private String hash;
-    private Long order;
+    private Long runOrder;
 
     public static final String createdAt_ = "created_at";
     public static final String lastExecutedAt_ = "last_executed_at";
@@ -20,7 +20,7 @@ public class MigrationLog {
     public static final String name_ = "name";
     public static final String filename_ = "filename";
     public static final String hash_ = "hash";
-    public static final String order_ = "order";
+    public static final String runOrder_ = "run_order";
 
     public MigrationLog(Instant createdAt,
                         Instant lastRunAt,
@@ -29,7 +29,7 @@ public class MigrationLog {
                         String name,
                         String filename,
                         String hash,
-                        Long order
+                        Long runOrder
     ) {
         this.createdAt = createdAt;
         this.lastExecutedAt = lastRunAt;
@@ -38,7 +38,7 @@ public class MigrationLog {
         this.name = name;
         this.filename = filename;
         this.hash = hash;
-        this.order = order;
+        this.runOrder = runOrder;
     }
 
     public String getName() {
