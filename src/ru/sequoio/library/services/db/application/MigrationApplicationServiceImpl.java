@@ -5,6 +5,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -135,26 +137,26 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         try (var conn = dataSource.getConnection()) {
             List<MigrationLog> migrationLog = new ArrayList<>();
 
-            var statement = conn.prepareStatement(queryProvider.getMigrationLogPreparedQuery(MIGRATION_LOG_TABLE_NAME));
-            var resultset = statement.executeQuery();
-            resultset.next();
-            if (!resultset.isFirst()) {
+            var statement = conn.prepareStatement(queryProvider.getSelectMigrationLogPreparedQuery(MIGRATION_LOG_TABLE_NAME));
+            var resultSet = statement.executeQuery();
+            resultSet.next();
+            if (!resultSet.isFirst()) {
                 return migrationLog;
             }
             do {
                 migrationLog.add(
                         new MigrationLog(
-                                resultset.getTimestamp(MigrationLog.createdAt_).toInstant(),
-                                resultset.getTimestamp(MigrationLog.lastExecutedAt_).toInstant(),
-                                resultset.getString(MigrationLog.runModifier_),
-                                resultset.getString(MigrationLog.author_),
-                                resultset.getString(MigrationLog.name_),
-                                resultset.getString(MigrationLog.filename_),
-                                resultset.getString(MigrationLog.hash_),
-                                resultset.getLong(MigrationLog.runOrder_)
+                                resultSet.getTimestamp(MigrationLog.createdAt_).toInstant(),
+                                resultSet.getTimestamp(MigrationLog.lastExecutedAt_).toInstant(),
+                                resultSet.getString(MigrationLog.runModifier_),
+                                resultSet.getString(MigrationLog.author_),
+                                resultSet.getString(MigrationLog.name_),
+                                resultSet.getString(MigrationLog.filename_),
+                                resultSet.getString(MigrationLog.hash_),
+                                resultSet.getLong(MigrationLog.runOrder_)
                         )
                 );
-            } while (resultset.next());
+            } while (resultSet.next());
 
             return migrationLog;
         }
@@ -172,28 +174,98 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     }
 
     private void applyMigration(Migration migration) {
-
+        try {
+            List<String> statements = migration.getStatements();
+            if (migration.isTransactional()) {
+                try (var conn = dataSource.getConnection()) {
+                    conn.setAutoCommit(false);
+                    for (String statement : statements) {
+                        PreparedStatement preparedStatement = conn.prepareStatement(statement);
+                        preparedStatement.execute();
+                    }
+                    conn.commit();
+                }
+            } else {
+                try (var conn = dataSource.getConnection()) {
+                    for (String statement : statements) {
+                        PreparedStatement preparedStatement = conn.prepareStatement(statement);
+                        preparedStatement.execute();
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            if (migration.isFailOnError()) {
+                throw new RuntimeException(e);
+            } else {
+                //log.warn("Failed to apply migration: {}", migration.getName(), e); todo: добавить логирование
+            }
+        }
     }
 
-    private void addMigrationLog(Migration migration) {
+    private void addMigrationLog(Migration migration) throws SQLException {
+        MigrationLog migrationLog = new MigrationLog(
+                migration.getRunModifier().getValueAsString(),
+                migration.getAuthor(),
+                migration.getTitle(),
+                migration.getPath().toString(),
+                migration.getHash(),
+                migration.getActualOrder());
 
+        try (var conn = dataSource.getConnection()) {
+            String query = queryProvider.getInsertMigrationLogQuery(MIGRATION_LOG_TABLE_NAME);
+            var statement = conn.prepareStatement(query);
+            DBUtils.prepare(statement,
+                List.of(
+                    migrationLog.getName(),
+                    migrationLog.getFilename(),
+                    migrationLog.getAuthor(),
+                    migrationLog.getRunModifier(),
+                    migrationLog.getHash(),
+                    migrationLog.getRunOrder()
+                ));
+            statement.executeUpdate();
+        }
+
+        migration.setLoggedMigration(migrationLog);
     }
 
-    private void updateMigrationLog(Migration migration) {
+    private void updateMigrationLog(Migration migration) throws SQLException {
+        migration.updateMigrationLog();
+        MigrationLog migrationLog = migration.getLoggedMigration();
 
+        try (var conn = dataSource.getConnection()) {
+            String query = queryProvider.getUpdateMigrationLogPreparedQuery(MIGRATION_LOG_TABLE_NAME);
+            var statement = conn.prepareStatement(query);
+            DBUtils.prepare(statement,
+                    List.of(
+                        migrationLog.getFilename(),
+                        migrationLog.getAuthor(),
+                        migrationLog.getRunModifier(),
+                        migrationLog.getRunOrder(),
+                        migrationLog.getHash(),
+                        migrationLog.getName()
+                    )
+            );
+            statement.executeUpdate();
+        }
     }
 
     private void tryApplyMigration(Migration migration) {
-        setRunStatusAndMigrationLog(migration);
-        boolean isSifted = sieve.sift(migration);
-        if (isSifted) {
-            r(migration);
-            if (migration.getLoggedMigration() != null) {
-                updateMigrationLog(migration);
+        try {
+            setRunStatusAndMigrationLog(migration);
+            boolean shouldBeApplied = sieve.sift(migration);
+            if (shouldBeApplied) {
+                applyMigration(migration);
+                if (migration.getLoggedMigration() != null) {
+                    updateMigrationLog(migration);
+                }
+                else {
+                    addMigrationLog(migration);
+                }
             }
-            else {
-                addMigrationLog(migration);
-            }
+            migration.getLoggedMigration().setApplied();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -248,9 +320,18 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         init();
 
         try {
+            AtomicLong idx = new AtomicLong(0);
             migrationGraph.getOrderedNodes().stream()
                     .map(node -> (Migration) node)
+                    .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
                     .forEach(this::tryApplyMigration);
+            var notAppliedMigrations = migrationLog.values().stream()
+                    .filter(MigrationLog::isNotApplied)
+                    .map(Objects::toString)
+                    .collect(Collectors.toList());
+            if (notAppliedMigrations.size() > 0) {
+                throw new IllegalStateException("Failed to apply migrations! There are possibly deleted migrations:\n"  + notAppliedMigrations);
+            }
         } catch (Exception e) { //todo: удалить к чертям
             e.printStackTrace();
         }

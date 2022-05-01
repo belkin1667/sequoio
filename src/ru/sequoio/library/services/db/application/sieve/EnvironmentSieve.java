@@ -12,6 +12,9 @@ public class EnvironmentSieve implements Sieve<Migration> {
 
     @Override
     public boolean sift(Migration migration) {
+        if (migration.getEnvironment() == null) {
+            return true;
+        }
         return migration.getEnvironment().equals(environment);
     }
 

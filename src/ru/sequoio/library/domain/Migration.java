@@ -1,6 +1,7 @@
 package ru.sequoio.library.domain;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,8 @@ import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
  */
 public class Migration extends Node {
 
+    private final static String STATEMENT_SPLIT_CHAR = ";";
+
     private Path path;
     private String title;
     private String author;
@@ -24,6 +27,7 @@ public class Migration extends Node {
     private Map<String, String> userDefinedParams;
     private RunStatus runStatus;
     private MigrationLog loggedMigration;
+    private Long actualOrder;
 
     private Migration(Path path,
                      Integer naturalOrder,
@@ -94,6 +98,18 @@ public class Migration extends Node {
         return ((BooleanParameterValue) params.get(MigrationParameter.IGNORE)).getValue();
     }
 
+    public String getAuthor() {
+        return author;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public Path getPath() {
+        return path;
+    }
+
     @Override
     public String toString() {
         return "Migration{" + "\n" +
@@ -110,6 +126,35 @@ public class Migration extends Node {
         return new MigrationBuilder();
     }
 
+    public Long getActualOrder() {
+        return actualOrder;
+    }
+
+    public void setActualOrder(Long actualOrder) {
+        this.actualOrder = actualOrder;
+    }
+
+    public void updateMigrationLog() {
+        if (loggedMigration != null) {
+            loggedMigration.setRunModifier(getRunModifier().getValueAsString());
+            loggedMigration.setAuthor(getAuthor());
+            loggedMigration.setFilename(getPath().toString());
+            loggedMigration.setHash(getHash());
+            loggedMigration.setRunOrder(getActualOrder());
+        }
+    }
+
+    public List<String> getStatements() {
+        return Arrays.asList(body.split(STATEMENT_SPLIT_CHAR));
+    }
+
+    public boolean isTransactional() {
+        return ((BooleanParameterValue) params.get(MigrationParameter.TRANSACTIONAL)).getValue();
+    }
+
+    public boolean isFailOnError() {
+        return ((BooleanParameterValue) params.get(MigrationParameter.FAIL_FAST)).getValue();
+    }
 
     public static class MigrationBuilder {
 

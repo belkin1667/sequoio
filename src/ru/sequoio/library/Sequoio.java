@@ -61,10 +61,6 @@ public class Sequoio {
         changelogParser.setResourcesDirectory(resourcesDirectory);
     }
 
-    public void setEnvironment(String environment) {
-        migrationParser.setEnvironment(environment);
-    }
-
     public void setDefaultSchema(String defaultSchema) {
         migrationApplier.setDefaultSchema(defaultSchema);
     }
