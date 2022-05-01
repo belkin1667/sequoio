@@ -36,9 +36,9 @@ public class Sequoio {
                    DataSource dataSource,
                    SupportedDatabases database
     ) {
-        this.migrationParser = new MigrationParsingService(environment);
+        this.migrationParser = new MigrationParsingService();
         this.changelogParser = new ChangelogParsingService(migrationParser, resourcesDirectory);
-        this.migrationApplier = new MigrationApplicationServiceImpl(dataSource, defaultSchema, database.getQueryProvider());
+        this.migrationApplier = new MigrationApplicationServiceImpl(dataSource, defaultSchema, database.getQueryProvider(), environment);
     }
 
     /**
@@ -59,10 +59,6 @@ public class Sequoio {
 
     public void setResourcesDirectory(String resourcesDirectory) {
         changelogParser.setResourcesDirectory(resourcesDirectory);
-    }
-
-    public void setEnvironment(String environment) {
-        migrationParser.setEnvironment(environment);
     }
 
     public void setDefaultSchema(String defaultSchema) {

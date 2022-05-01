@@ -1,18 +1,23 @@
 package ru.sequoio.library.domain;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import ru.sequoio.library.domain.graph.Node;
+import ru.sequoio.library.domain.migration_paramters.BooleanParameterValue;
 import ru.sequoio.library.domain.migration_paramters.MigrationParameter;
 import ru.sequoio.library.domain.migration_paramters.ParameterValue;
+import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
 
 /**
  * Single SQL expression
  */
 public class Migration extends Node {
+
+    private final static String STATEMENT_SPLIT_CHAR = ";";
 
     private Path path;
     private String title;
@@ -20,6 +25,9 @@ public class Migration extends Node {
     private String body;
     private Map<MigrationParameter, ParameterValue> params;
     private Map<String, String> userDefinedParams;
+    private RunStatus runStatus;
+    private MigrationLog loggedMigration;
+    private Long actualOrder;
 
     private Migration(Path path,
                      Integer naturalOrder,
@@ -44,6 +52,22 @@ public class Migration extends Node {
                         : body + ";";
     }
 
+    public RunStatus getRunStatus() {
+        return runStatus;
+    }
+
+    public void setRunStatus(RunStatus runStatus) {
+        this.runStatus = runStatus;
+    }
+
+    public MigrationLog getLoggedMigration() {
+        return loggedMigration;
+    }
+
+    public void setLoggedMigration(MigrationLog loggedMigration) {
+        this.loggedMigration = loggedMigration;
+    }
+
     @Override
     public List<String> getExplicitPreviousNodeNames() {
         return Optional.ofNullable(params.get(MigrationParameter.RUN_AFTER).getValueAsString())
@@ -58,21 +82,88 @@ public class Migration extends Node {
                 .orElse(List.of());
     }
 
+    public String getHash() {
+        return body; //todo: add hashing here
+    }
+
+    public RunParameterValue getRunModifier() {
+        return (RunParameterValue) params.get(MigrationParameter.RUN);
+    }
+
+    public String getEnvironment() {
+        return params.get(MigrationParameter.ENVIRONMENT).getValueAsString();
+    }
+
+    public Boolean getIgnored() {
+        return ((BooleanParameterValue) params.get(MigrationParameter.IGNORE)).getValue();
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public Path getPath() {
+        return path;
+    }
+
+    @Override
+    public String toString() {
+        return "Migration{" + "\n" +
+                "path=" + path + "\n" +
+                ", title=" + title + "\n" +
+                ", author=" + author + "\n" +
+                ", body=" + body + "\n" +
+                ", params=" + params + "\n" +
+                ", userDefinedParams=" + userDefinedParams + "\n" +
+                '}';
+    }
+
     public static MigrationBuilder builder() {
         return new MigrationBuilder();
     }
 
-    public String getHash() {
-        return body; //todo: add hashing here
+    public Long getActualOrder() {
+        return actualOrder;
+    }
+
+    public void setActualOrder(Long actualOrder) {
+        this.actualOrder = actualOrder;
+    }
+
+    public void updateMigrationLog() {
+        if (loggedMigration != null) {
+            loggedMigration.setRunModifier(getRunModifier().getValueAsString());
+            loggedMigration.setAuthor(getAuthor());
+            loggedMigration.setFilename(getPath().toString());
+            loggedMigration.setHash(getHash());
+            loggedMigration.setRunOrder(getActualOrder());
+        }
+    }
+
+    public List<String> getStatements() {
+        return Arrays.asList(body.split(STATEMENT_SPLIT_CHAR));
+    }
+
+    public boolean isTransactional() {
+        return ((BooleanParameterValue) params.get(MigrationParameter.TRANSACTIONAL)).getValue();
+    }
+
+    public boolean isFailOnError() {
+        return ((BooleanParameterValue) params.get(MigrationParameter.FAIL_FAST)).getValue();
     }
 
     public static class MigrationBuilder {
 
         private String title;
         private String author;
-        private Map<MigrationParameter, ParameterValue> params;
-        private Map<String, String> userDefinedParams;
 
+        private Map<MigrationParameter, ParameterValue> params;
+
+        private Map<String, String> userDefinedParams;
         public MigrationBuilder header(String title,
                                        String author,
                                        Map<MigrationParameter, ParameterValue> params,
@@ -92,21 +183,6 @@ public class Migration extends Node {
             }
             return new Migration(path, naturalOrder, body, title, author, params, userDefinedParams);
         }
-    }
 
-    public String getRunModifier() {
-        return params.get(MigrationParameter.RUN).getValueAsString();
-    }
-
-    @Override
-    public String toString() {
-        return "Migration{" + "\n" +
-                    "path=" + path + "\n" +
-                    ", title=" + title + "\n" +
-                    ", author=" + author + "\n" +
-                    ", body=" + body + "\n" +
-                    ", params=" + params + "\n" +
-                    ", userDefinedParams=" + userDefinedParams + "\n" +
-                '}';
     }
 }

@@ -1,5 +1,7 @@
 package ru.sequoio.library.services.db.query;
 
+import ru.sequoio.library.domain.MigrationLog;
+
 public class PostgresQueryProvider implements QueryProvider {
 
     private static final String STATEMENT_SEPARATOR = "\n";
@@ -12,15 +14,40 @@ public class PostgresQueryProvider implements QueryProvider {
     }
 
     @Override
-    public String getCreateMigrationLogQuery() {
-        return null;
+    public String getInsertMigrationLogQuery(String migrationLogTableName) {
+        return String.format(
+                "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s) ",
+            migrationLogTableName,
+            MigrationLog.name_,
+            MigrationLog.filename_,
+            MigrationLog.author_,
+            MigrationLog.runModifier_,
+            MigrationLog.hash_,
+            MigrationLog.runOrder_,
+            MigrationLog.createdAt_,
+            MigrationLog.lastExecutedAt_
+        ) + "VALUES (?, ?, ?, ?, ?, ?, now(), now());";
     }
 
     @Override
-    public String getMigrationLogPreparedQuery(String migrationLogTableName) {
+    public String getSelectMigrationLogPreparedQuery(String migrationLogTableName) {
         return String.format(
                     "SELECT * " +
                     "FROM %s;"
+                , migrationLogTableName);
+    }
+
+    @Override
+    public String getUpdateMigrationLogPreparedQuery(String migrationLogTableName) {
+        return String.format(
+                    "UPDATE %s " +
+                    "SET last_executed_at = now(), " +
+                    "    filename = ?, " +
+                    "    author = ?, " +
+                    "    run_modifier = ?, " +
+                    "    run_order = ?, " +
+                    "    hash = ? " +
+                    "where name = ?;"
                 , migrationLogTableName);
     }
 
