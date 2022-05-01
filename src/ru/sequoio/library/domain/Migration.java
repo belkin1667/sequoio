@@ -11,6 +11,7 @@ import ru.sequoio.library.domain.migration_paramters.BooleanParameterValue;
 import ru.sequoio.library.domain.migration_paramters.MigrationParameter;
 import ru.sequoio.library.domain.migration_paramters.ParameterValue;
 import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
+import ru.sequoio.library.utils.HashingUtils;
 
 /**
  * Single SQL expression
@@ -83,7 +84,7 @@ public class Migration extends Node {
     }
 
     public String getHash() {
-        return body; //todo: add hashing here
+        return HashingUtils.md5(body);
     }
 
     public RunParameterValue getRunModifier() {
