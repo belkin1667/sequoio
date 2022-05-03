@@ -8,6 +8,7 @@ class GraphTest {
     @Test
     void test() {
         Assertions.assertTrue(true);
+        
     }
 
 }
