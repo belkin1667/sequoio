@@ -45,12 +45,6 @@ public class Sequoio {
      * Entry point of library
      * Runs on Sequoio class creation
      */
-    /*
-        1. Parse all changelog files
-        2. Parse all migration files
-        3. Connect to database
-        4. Apply migrations to database
-    */
     public void init() {
         Graph<Migration> migrationGraph = changelogParser.parseChangelog();
 
@@ -70,11 +64,3 @@ public class Sequoio {
     }
 
 }
-
-
-/*
-
-1. Считываем чендж-лог файл = получаем пути к миграциям
-2. Считываем файлы миграций = получаем SQL-выражения
-
- */

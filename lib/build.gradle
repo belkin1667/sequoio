@@ -9,10 +9,31 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    testImplementation 'junit:junit:4.12'
+sourceSets {
+    main {
+        java {
+            srcDirs 'main'
+        }
+    }
+    test {
+        java {
+            srcDirs 'test'
+        }
+    }
 }
 
-tasks.named('test') {
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
     useJUnitPlatform()
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes('Implementation-Title': rootProject.name,
+                'Implementation-Version': project.version)
+    }
 }
