@@ -13,7 +13,6 @@ class GraphTest {
     @Test
     void anotherTest() {
         Assertions.assertTrue(true);
-        
     }
 
 }
