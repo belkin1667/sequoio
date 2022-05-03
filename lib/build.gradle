@@ -33,7 +33,7 @@ test {
 
 tasks.named('jar') {
     manifest {
-        attributes('Implementation-Title': rootProject.name,
-                'Implementation-Version': project.version)
+        attributes 'Implementation-Title': rootProject.name,
+                   'Implementation-Version': project.version
     }
 }

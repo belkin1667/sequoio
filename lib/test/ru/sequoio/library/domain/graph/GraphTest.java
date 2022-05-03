@@ -10,4 +10,9 @@ class GraphTest {
         Assertions.assertTrue(true);
     }
 
+    @Test
+    void anotherTest() {
+        Assertions.assertTrue(false);
+    }
+
 }
