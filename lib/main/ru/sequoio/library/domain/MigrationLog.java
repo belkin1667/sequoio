@@ -2,8 +2,6 @@ package ru.sequoio.library.domain;
 
 import java.time.Instant;
 
-import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
-
 public class MigrationLog {
 
     private Instant createdAt;
