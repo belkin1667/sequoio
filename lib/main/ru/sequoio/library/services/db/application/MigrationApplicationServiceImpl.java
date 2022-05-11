@@ -12,9 +12,9 @@ import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
-import ru.sequoio.library.domain.Migration;
-import ru.sequoio.library.domain.MigrationLog;
-import ru.sequoio.library.domain.RunStatus;
+import ru.sequoio.library.domain.migration.Migration;
+import ru.sequoio.library.domain.migration.MigrationLog;
+import ru.sequoio.library.domain.migration.RunStatus;
 import ru.sequoio.library.domain.graph.Graph;
 import ru.sequoio.library.services.db.application.sieve.SieveChain;
 import ru.sequoio.library.services.db.query.QueryProvider;

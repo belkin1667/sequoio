@@ -1,4 +1,4 @@
-package ru.sequoio.library.domain;
+package ru.sequoio.library.domain.migration;
 
 public enum RunStatus {
     APPLIED,

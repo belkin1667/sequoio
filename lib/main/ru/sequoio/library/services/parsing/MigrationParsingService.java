@@ -13,8 +13,8 @@ import java.util.regex.MatchResult;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import ru.sequoio.library.domain.Migration;
-import ru.sequoio.library.domain.migration_paramters.MigrationParameter;
+import ru.sequoio.library.domain.migration.Migration;
+import ru.sequoio.library.domain.migration.migration_paramters.MigrationParameter;
 import ru.sequoio.library.exception.InvalidFileFormatException;
 import ru.sequoio.library.utils.IOUtils;
 

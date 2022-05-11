@@ -1,6 +1,6 @@
 package ru.sequoio.library.services.db.application.sieve;
 
-import ru.sequoio.library.domain.Migration;
+import ru.sequoio.library.domain.migration.Migration;
 
 public class EnvironmentSieve implements Sieve<Migration> {
 

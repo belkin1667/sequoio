@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'checkstyle'
 }
 
 group 'ru.sequoio'
@@ -29,6 +30,10 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+checkstyle {
+    sourceSets = [] // do not run checkstyle on build
 }
 
 tasks.named('jar') {

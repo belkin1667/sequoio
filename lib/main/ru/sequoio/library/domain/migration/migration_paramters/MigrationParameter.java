@@ -1,4 +1,4 @@
-package ru.sequoio.library.domain.migration_paramters;
+package ru.sequoio.library.domain.migration.migration_paramters;
 
 import java.util.Arrays;
 import java.util.HashMap;

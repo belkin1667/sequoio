@@ -2,7 +2,7 @@ package ru.sequoio.library.services.db.application;
 
 import javax.sql.DataSource;
 
-import ru.sequoio.library.domain.Migration;
+import ru.sequoio.library.domain.migration.Migration;
 import ru.sequoio.library.domain.graph.Graph;
 
 public interface MigrationApplicationService {

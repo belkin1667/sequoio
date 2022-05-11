@@ -1,4 +1,4 @@
-package ru.sequoio.library.domain;
+package ru.sequoio.library.domain.migration;
 
 import java.time.Instant;
 
