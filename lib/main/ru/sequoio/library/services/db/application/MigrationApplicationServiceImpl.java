@@ -12,7 +12,10 @@ import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.sequoio.library.domain.migration.Migration;
+import ru.sequoio.library.domain.migration.MigrationLock;
 import ru.sequoio.library.domain.migration.MigrationLog;
 import ru.sequoio.library.domain.migration.RunStatus;
 import ru.sequoio.library.domain.graph.Graph;
@@ -22,18 +25,19 @@ import ru.sequoio.library.utils.DBUtils;
 
 public class MigrationApplicationServiceImpl implements MigrationApplicationService {
 
+    private final static Logger LOGGER = LoggerFactory.getLogger(MigrationApplicationService.class);
 
     public final static String MIGRATION_LOG_TABLE_NAME = "migration_log";
     public final static String MIGRATION_LOG_LOCK_TABLE_NAME = "migration_log_lock";
     public final static Integer LOCK_WAIT_TIME_MS = 1000;
     public final static Integer LOCK_WAIT_COUNTER_THRESHOLD = 15;
 
-    private DataSource dataSource;
-    private String defaultSchema;
-    private QueryProvider queryProvider;
+    private final QueryProvider queryProvider;
+    private final SieveChain sieve;
+    private final DataSource dataSource;
+    private final String defaultSchema;
+
     private Map<String, MigrationLog> migrationLog;
-    private int lockWaitCounter = 0;
-    private SieveChain sieve;
 
     public MigrationApplicationServiceImpl(
             DataSource dataSource,
@@ -47,10 +51,72 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         this.sieve = new SieveChain(environment);
     }
 
-    private boolean executeBooleanPreparedStatement(PreparedStatement statement, String columnName) throws SQLException {
-        var resultSet = statement.executeQuery();
-        resultSet.next();
-        return resultSet.getBoolean(columnName);
+    @Override
+    public void applyMigrationsFromGraph(Graph<Migration> migrationGraph) {
+        LOGGER.debug("Applying migration graph");
+        init();
+
+        try {
+            AtomicLong idx = new AtomicLong(0);
+            migrationGraph.getOrderedNodes().stream()
+                    .map(node -> (Migration) node)
+                    .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
+                    .forEach(this::tryApplyMigration);
+            var notAppliedMigrations = migrationLog.values().stream()
+                    .filter(MigrationLog::isNotApplied)
+                    .map(Objects::toString)
+                    .collect(Collectors.toList());
+            if (notAppliedMigrations.size() > 0) {
+                throw new IllegalStateException("Failed to apply migrations! " +
+                        "There are possibly deleted migrations:\n"  + notAppliedMigrations);
+            }
+        } catch (Exception e) { //todo: удалить к чертям
+            e.printStackTrace();
+        }
+
+        terminate();
+    }
+
+    private void init() {
+        LOGGER.debug("Initializing Sequoio migration task");
+        try {
+            migrationLog = getOrCreateMigrationLog().stream()
+                    .collect(Collectors.toMap(MigrationLog::getName, Function.identity()));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void terminate() {
+        LOGGER.debug("Terminating Sequoio migration task");
+        try {
+            releaseLock();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void tryApplyMigration(Migration migration) {
+        LOGGER.info("Processing migration: {}", migration.getName());
+        try {
+            setRunStatusAndMigrationLog(migration);
+            boolean shouldBeApplied = sieve.sift(migration);
+            if (shouldBeApplied) {
+                applyMigration(migration);
+                if (migration.getLoggedMigration() != null) {
+                    updateMigrationLog(migration);
+                }
+                else {
+                    addMigrationLog(migration);
+                }
+            }
+            migration.getLoggedMigration().setApplied();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -59,27 +125,32 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
      * Else create tables
      */
     private List<MigrationLog> getOrCreateMigrationLog() throws SQLException, InterruptedException {
+        LOGGER.debug("Checking that 'migration log' and 'migration lock' exist...");
+
         boolean migrationLogExists, migrationLogLockExists;
 
         try (var conn = dataSource.getConnection()) {
             var statement = conn.prepareStatement(queryProvider.getTableExistsPreparedQuery());
 
             DBUtils.prepare(statement, List.of(defaultSchema, MIGRATION_LOG_TABLE_NAME));
-            migrationLogExists = executeBooleanPreparedStatement(statement, "is_present");
+            migrationLogExists = DBUtils.executeIsPresentPreparedStatement(statement);
 
             DBUtils.prepare(statement, List.of(defaultSchema, MIGRATION_LOG_LOCK_TABLE_NAME));
-            migrationLogLockExists = executeBooleanPreparedStatement(statement, "is_present");
+            migrationLogLockExists = DBUtils.executeIsPresentPreparedStatement(statement);
         }
 
-        if (migrationLogExists && migrationLogLockExists) { //both exist
-            acquireLock(); // guarantees that migration log will not be changed by other possible migration processes
+        if (migrationLogExists && migrationLogLockExists) {
+            LOGGER.debug("Both 'migration log' and 'migration lock' are present!");
+            acquireLock();
             return getMigrationLog();
-        } else if (!migrationLogExists && !migrationLogLockExists) { //both do not exist
+        } else if (!migrationLogExists && !migrationLogLockExists) {
+            LOGGER.debug("Both 'migration log' and 'migration lock' are not present!");
             createMigrationLogAndLock();
             return List.of();
-        } else { // one is missing
+        } else { // one missing
             String missingTable = migrationLogExists ? MIGRATION_LOG_LOCK_TABLE_NAME : MIGRATION_LOG_TABLE_NAME;
-            throw new IllegalStateException(String.format("Illegal database state, table %s is missing!", missingTable));
+            throw new IllegalStateException(String.format("Illegal database state, " +
+                                                                "table %s is missing!", missingTable));
         }
     }
 
@@ -89,18 +160,22 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
      *
      * @return 'true' if lock acquired successfully, 'false' otherwise
      */
-    private boolean tryAcquireLock() throws SQLException {
+    private boolean tryAcquireLock(int attempt) throws SQLException {
+        LOGGER.info("Trying to acquire lock. Attempt {}...", attempt);
         try (var conn = dataSource.getConnection()) {
             conn.setAutoCommit(false);
-            var isLockedStatement = conn.prepareStatement(queryProvider.getIsLockedPreparedQuery(MIGRATION_LOG_LOCK_TABLE_NAME));
-            var locked = executeBooleanPreparedStatement(isLockedStatement, "locked");
+            var isLockedPreparedQuery = queryProvider.getIsLockedPreparedQuery(MIGRATION_LOG_LOCK_TABLE_NAME);
+            var isLockedStatement = conn.prepareStatement(isLockedPreparedQuery);
+            var locked = DBUtils.executeBooleanPreparedStatement(isLockedStatement, MigrationLock.locked_);
             if (locked) {
                 conn.commit();
+                LOGGER.debug("Failed to acquire lock. Already locked!");
                 return false;
             }
             var acquireLockStatement = conn.prepareStatement(queryProvider.getAcquireLockPreparedQuery(MIGRATION_LOG_LOCK_TABLE_NAME));
             acquireLockStatement.execute();
             conn.commit();
+            LOGGER.info("Lock acquired!");
             return true;
         }
     }
@@ -109,10 +184,12 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
      * Acquires lock with some number of retries and some delay time between tries
      */
     private void acquireLock() throws SQLException, InterruptedException {
-        while (!tryAcquireLock()) {
-            lockWaitCounter++;
-            if (lockWaitCounter >= LOCK_WAIT_COUNTER_THRESHOLD) {
-                throw new IllegalStateException(String.format("Could not acquire lock in %d seconds", lockWaitCounter * LOCK_WAIT_TIME_MS / 1000));
+        LOGGER.debug("Acquiring lock");
+        int attempt = 0;
+        while (!tryAcquireLock(attempt)) {
+            attempt++;
+            if (attempt >= LOCK_WAIT_COUNTER_THRESHOLD) {
+                throw new IllegalStateException(String.format("Could not acquire lock in %d seconds", attempt * LOCK_WAIT_TIME_MS / 1000));
             }
             Thread.sleep(LOCK_WAIT_TIME_MS);
         }
@@ -122,9 +199,11 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
      * Releases lock
      */
     private void releaseLock() throws SQLException {
+        LOGGER.debug("Releasing lock");
         try (var conn = dataSource.getConnection()) {
-            var statement  = conn.prepareStatement(queryProvider.getReleaseLockPreparedQuery(MIGRATION_LOG_LOCK_TABLE_NAME));
-            statement.execute();
+            var releaseLockQuery = queryProvider.getReleaseLockPreparedQuery(MIGRATION_LOG_LOCK_TABLE_NAME);
+            var releaseLockStatement  = conn.prepareStatement(releaseLockQuery);
+            releaseLockStatement.execute();
         }
     }
 
@@ -134,11 +213,13 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
      * @return loaded migration log
      */
     private List<MigrationLog> getMigrationLog() throws SQLException {
+        LOGGER.debug("Getting migration log");
         try (var conn = dataSource.getConnection()) {
             List<MigrationLog> migrationLog = new ArrayList<>();
 
-            var statement = conn.prepareStatement(queryProvider.getSelectMigrationLogPreparedQuery(MIGRATION_LOG_TABLE_NAME));
-            var resultSet = statement.executeQuery();
+            var selectMigrationLogQuery = queryProvider.getSelectMigrationLogPreparedQuery(MIGRATION_LOG_TABLE_NAME);
+            var selectMigrationLogStatement = conn.prepareStatement(selectMigrationLogQuery);
+            var resultSet = selectMigrationLogStatement.executeQuery();
             resultSet.next();
             if (!resultSet.isFirst()) {
                 return migrationLog;
@@ -166,14 +247,19 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
      * Creates 'migration log' and 'migration log lock' tables
      */
     private void createMigrationLogAndLock() throws SQLException {
+        LOGGER.debug("Creating 'migration log' and 'migration lock' tables");
         try(var conn = dataSource.getConnection()) {
-            String query = queryProvider.getCreateMigrationLogAndMigrationLogLockQuery(MIGRATION_LOG_TABLE_NAME, MIGRATION_LOG_LOCK_TABLE_NAME);
-            var statement = conn.prepareStatement(query);
+            String createMigrationLogAndLockTablesQuery = queryProvider.getCreateMigrationLogAndMigrationLogLockQuery(
+                    MIGRATION_LOG_TABLE_NAME,
+                    MIGRATION_LOG_LOCK_TABLE_NAME
+            );
+            var statement = conn.prepareStatement(createMigrationLogAndLockTablesQuery);
             statement.execute();
         }
     }
 
     private void applyMigration(Migration migration) {
+        LOGGER.debug("Applying migration: {}", migration.getName());
         try {
             List<String> statements = migration.getStatements();
             if (migration.isTransactional()) {
@@ -197,12 +283,13 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
             if (migration.isFailOnError()) {
                 throw new RuntimeException(e);
             } else {
-                //log.warn("Failed to apply migration: {}", migration.getName(), e); todo: добавить логирование
+                LOGGER.warn("Failed to apply migration: {}", migration.getName(), e);
             }
         }
     }
 
     private void addMigrationLog(Migration migration) throws SQLException {
+        LOGGER.debug("Adding new migration log record for migration {}", migration.getName());
         MigrationLog migrationLog = new MigrationLog(
                 migration.getRunModifier().getValueAsString(),
                 migration.getAuthor(),
@@ -230,6 +317,7 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     }
 
     private void updateMigrationLog(Migration migration) throws SQLException {
+        LOGGER.debug("Updating migration log record for migration {}", migration.getName());
         migration.updateMigrationLog();
         MigrationLog migrationLog = migration.getLoggedMigration();
 
@@ -250,26 +338,9 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         }
     }
 
-    private void tryApplyMigration(Migration migration) {
-        try {
-            setRunStatusAndMigrationLog(migration);
-            boolean shouldBeApplied = sieve.sift(migration);
-            if (shouldBeApplied) {
-                applyMigration(migration);
-                if (migration.getLoggedMigration() != null) {
-                    updateMigrationLog(migration);
-                }
-                else {
-                    addMigrationLog(migration);
-                }
-            }
-            migration.getLoggedMigration().setApplied();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private void setRunStatusAndMigrationLog(Migration migration) {
+        LOGGER.debug("Setting run status and migration log for migration {}", migration.getName());
 
-    private Migration setRunStatusAndMigrationLog(Migration migration) {
         var loggedMigration = migrationLog.get(migration.getName());
         if (loggedMigration == null) {
             migration.setRunStatus(RunStatus.NEW);
@@ -280,62 +351,8 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         else {
             migration.setRunStatus(RunStatus.BODY_CHANGED);
         }
+        LOGGER.debug("Migration {} has '{}' run status", migration.getName(), migration.getRunStatus());
+
         migration.setLoggedMigration(loggedMigration);
-
-        return migration;
-    }
-
-    @Override
-    public void setDefaultSchema(String defaultSchema) {
-        this.defaultSchema = defaultSchema;
-    }
-
-    @Override
-    public void setDataSource(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
-
-    protected void init() {
-        try {
-            migrationLog = getOrCreateMigrationLog().stream()
-                    .collect(Collectors.toMap(MigrationLog::getName, Function.identity()));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    protected void terminate() {
-        try {
-            releaseLock();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public void apply(Graph<Migration> migrationGraph) {
-        init();
-
-        try {
-            AtomicLong idx = new AtomicLong(0);
-            migrationGraph.getOrderedNodes().stream()
-                    .map(node -> (Migration) node)
-                    .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
-                    .forEach(this::tryApplyMigration);
-            var notAppliedMigrations = migrationLog.values().stream()
-                    .filter(MigrationLog::isNotApplied)
-                    .map(Objects::toString)
-                    .collect(Collectors.toList());
-            if (notAppliedMigrations.size() > 0) {
-                throw new IllegalStateException("Failed to apply migrations! There are possibly deleted migrations:\n"  + notAppliedMigrations);
-            }
-        } catch (Exception e) { //todo: удалить к чертям
-            e.printStackTrace();
-        }
-
-        terminate();
     }
 }
