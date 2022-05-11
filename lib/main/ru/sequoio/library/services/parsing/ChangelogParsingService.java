@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import ru.sequoio.library.domain.Migration;
+import ru.sequoio.library.domain.migration.Migration;
 import ru.sequoio.library.domain.graph.Graph;
 import ru.sequoio.library.utils.IOUtils;
 

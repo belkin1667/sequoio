@@ -6,7 +6,16 @@ import java.util.stream.Stream;
 
 public class StreamUtils {
 
-    public static <T> Stream<IndexedEntry<T>> indexate(Stream<T> s) {
+    private StreamUtils() { }
+
+    /**
+     * Constructs an ordered stream where each element has an index
+     *
+     * @param s input stream to indexate
+     * @param <T> type of values in input stream
+     * @return ordered stream of pairs (index, value)
+     */
+    public static <T> Stream<IndexedEntry<T>> indexate(final Stream<T> s) {
         AtomicInteger integer = new AtomicInteger(0);
         return s.map(el -> new IndexedEntry<>(integer.getAndIncrement(), el))
                 .collect(Collectors.toList()).stream();

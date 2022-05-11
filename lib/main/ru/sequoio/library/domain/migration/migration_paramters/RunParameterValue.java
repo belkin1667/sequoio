@@ -1,4 +1,4 @@
-package ru.sequoio.library.domain.migration_paramters;
+package ru.sequoio.library.domain.migration.migration_paramters;
 
 public enum RunParameterValue implements ParameterValue<String> {
     ONCE("once"),

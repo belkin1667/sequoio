@@ -2,7 +2,7 @@ package ru.sequoio.library.services.db.application.sieve;
 
 import java.util.List;
 
-import ru.sequoio.library.domain.Migration;
+import ru.sequoio.library.domain.migration.Migration;
 
 public class SieveChain implements Sieve<Migration> {
 

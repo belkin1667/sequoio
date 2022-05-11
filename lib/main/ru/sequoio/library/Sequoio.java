@@ -2,7 +2,7 @@ package ru.sequoio.library;
 
 import javax.sql.DataSource;
 
-import ru.sequoio.library.domain.Migration;
+import ru.sequoio.library.domain.migration.Migration;
 import ru.sequoio.library.domain.graph.Graph;
 import ru.sequoio.library.services.db.application.MigrationApplicationService;
 import ru.sequoio.library.services.db.application.MigrationApplicationServiceImpl;

@@ -1,4 +1,4 @@
-package ru.sequoio.library.domain.migration_paramters;
+package ru.sequoio.library.domain.migration.migration_paramters;
 
 public class StringParameterValue implements ParameterValue<String> {
 

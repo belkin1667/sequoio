@@ -1,8 +1,8 @@
 package ru.sequoio.library.services.db.application.sieve;
 
-import ru.sequoio.library.domain.Migration;
-import ru.sequoio.library.domain.RunStatus;
-import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
+import ru.sequoio.library.domain.migration.Migration;
+import ru.sequoio.library.domain.migration.RunStatus;
+import ru.sequoio.library.domain.migration.migration_paramters.RunParameterValue;
 
 public class RunSieve implements Sieve<Migration> {
 

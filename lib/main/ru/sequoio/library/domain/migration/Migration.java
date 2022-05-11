@@ -1,4 +1,4 @@
-package ru.sequoio.library.domain;
+package ru.sequoio.library.domain.migration;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -7,10 +7,10 @@ import java.util.Map;
 import java.util.Optional;
 
 import ru.sequoio.library.domain.graph.Node;
-import ru.sequoio.library.domain.migration_paramters.BooleanParameterValue;
-import ru.sequoio.library.domain.migration_paramters.MigrationParameter;
-import ru.sequoio.library.domain.migration_paramters.ParameterValue;
-import ru.sequoio.library.domain.migration_paramters.RunParameterValue;
+import ru.sequoio.library.domain.migration.migration_paramters.BooleanParameterValue;
+import ru.sequoio.library.domain.migration.migration_paramters.MigrationParameter;
+import ru.sequoio.library.domain.migration.migration_paramters.ParameterValue;
+import ru.sequoio.library.domain.migration.migration_paramters.RunParameterValue;
 import ru.sequoio.library.utils.HashingUtils;
 
 /**

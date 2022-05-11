@@ -1,6 +1,6 @@
 package ru.sequoio.library.services.db.query;
 
-import ru.sequoio.library.domain.MigrationLog;
+import ru.sequoio.library.domain.migration.MigrationLog;
 
 public class PostgresQueryProvider implements QueryProvider {
 
