@@ -53,13 +53,12 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
 
     @Override
     public void applyMigrationsFromGraph(Graph<Migration> migrationGraph) {
-        LOGGER.debug("Applying migration graph");
+        LOGGER.debug("Applying migrations from graph");
         init();
 
         try {
             AtomicLong idx = new AtomicLong(0);
             migrationGraph.getOrderedNodes().stream()
-                    .map(node -> (Migration) node)
                     .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
                     .forEach(this::tryApplyMigration);
             var notAppliedMigrations = migrationLog.values().stream()
@@ -100,7 +99,7 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     }
 
     private void tryApplyMigration(Migration migration) {
-        LOGGER.info("Processing migration: {}", migration.getName());
+        LOGGER.info("[MIGRATION] Processing migration: {}", migration.getName());
         try {
             setRunStatusAndMigrationLog(migration);
             boolean shouldBeApplied = sieve.sift(migration);

@@ -63,7 +63,7 @@ class GraphTest {
         return new LinkedList<>(List.of(orders));
     }
 
-    private void validateOrder(LinkedList<Node> orderedMigrations, LinkedList<Integer> migrationOrder) {
+    private void validateOrder(LinkedList<? extends Node> orderedMigrations, LinkedList<Integer> migrationOrder) {
         Assertions.assertEquals(orderedMigrations.size(), migrationOrder.size());
         while (!orderedMigrations.isEmpty()) {
             var node = orderedMigrations.pop();

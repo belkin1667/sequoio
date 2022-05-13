@@ -13,9 +13,8 @@ import ru.sequoio.library.services.parsing.MigrationParsingService;
 
 public class Sequoio {
 
-    private ChangelogParsingService changelogParser;
-    private MigrationParsingService migrationParser;
-    private MigrationApplicationService migrationApplier;
+    private final ChangelogParsingService changelogParser;
+    private final MigrationApplicationService migrationApplier;
 
     public Sequoio(String resourcesDirectory,
                    String environment,
@@ -24,9 +23,16 @@ public class Sequoio {
                    SupportedDatabases database,
                    boolean dryRun
     ) {
-        this(resourcesDirectory, environment, defaultSchema, dataSource, database);
+        this.changelogParser = new ChangelogParsingService(new MigrationParsingService(), resourcesDirectory);
         if (dryRun) {
             this.migrationApplier = new MigrationApplicationServiceDryRun();
+        } else {
+            this.migrationApplier = new MigrationApplicationServiceImpl(
+                    dataSource,
+                    defaultSchema,
+                    database.getQueryProvider(),
+                    environment
+            );
         }
     }
     
@@ -36,19 +42,14 @@ public class Sequoio {
                    DataSource dataSource,
                    SupportedDatabases database
     ) {
-        this.migrationParser = new MigrationParsingService();
-        this.changelogParser = new ChangelogParsingService(migrationParser, resourcesDirectory);
-        this.migrationApplier = new MigrationApplicationServiceImpl(dataSource, defaultSchema, database.getQueryProvider(), environment);
+        this(resourcesDirectory, environment, defaultSchema, dataSource, database, false);
     }
 
     /**
-     * Entry point of library
-     * Runs on Sequoio class creation
+     * Runs migration process
      */
-    public void init() {
-        Graph<Migration> migrationGraph = changelogParser.parseChangelog();
-
-        migrationApplier.applyMigrationsFromGraph(migrationGraph);
+    public void migrate() {
+        migrationApplier.applyMigrationsFromGraph(changelogParser.parseChangelog());
     }
 
 }

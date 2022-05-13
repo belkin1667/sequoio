@@ -15,8 +15,7 @@ public class MigrationApplicationServiceDryRun implements MigrationApplicationSe
 
     @Override
     public void applyMigrationsFromGraph(Graph<Migration> migrationGraph) {
-        migrationGraph.getOrderedNodes().stream()
-                .map(node -> (Migration)node)
+        migrationGraph.getOrderedNodes()
                 .forEach(this::applyMigration);
     }
 }
