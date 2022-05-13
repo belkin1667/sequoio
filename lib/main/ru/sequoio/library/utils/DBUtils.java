@@ -10,6 +10,8 @@ import java.util.stream.Stream;
 
 public class DBUtils {
 
+    private static final String IS_PRESENT_COLUMN_NAME = "is_present";
+
     public static void prepare(PreparedStatement statement, List<Object> args) {
         prepare(statement, args.stream());
     }
@@ -60,5 +62,16 @@ public class DBUtils {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+    public static boolean executeIsPresentPreparedStatement(PreparedStatement statement) throws SQLException {
+        return executeBooleanPreparedStatement(statement, IS_PRESENT_COLUMN_NAME);
+    }
+
+    public static boolean executeBooleanPreparedStatement(PreparedStatement statement, String columnName)
+            throws SQLException {
+        var resultSet = statement.executeQuery();
+        resultSet.next();
+        return resultSet.getBoolean(columnName);
     }
 }

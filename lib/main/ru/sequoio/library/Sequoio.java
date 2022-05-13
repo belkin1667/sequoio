@@ -8,7 +8,7 @@ import ru.sequoio.library.services.db.application.MigrationApplicationService;
 import ru.sequoio.library.services.db.application.MigrationApplicationServiceImpl;
 import ru.sequoio.library.services.db.query.SupportedDatabases;
 import ru.sequoio.library.services.parsing.ChangelogParsingService;
-import ru.sequoio.library.services.db.application.MigrationApplicationServiceMock;
+import ru.sequoio.library.services.db.application.MigrationApplicationServiceDryRun;
 import ru.sequoio.library.services.parsing.MigrationParsingService;
 
 public class Sequoio {
@@ -22,11 +22,11 @@ public class Sequoio {
                    String defaultSchema,
                    DataSource dataSource,
                    SupportedDatabases database,
-                   boolean mock
+                   boolean dryRun
     ) {
         this(resourcesDirectory, environment, defaultSchema, dataSource, database);
-        if (mock) {
-            this.migrationApplier = new MigrationApplicationServiceMock();
+        if (dryRun) {
+            this.migrationApplier = new MigrationApplicationServiceDryRun();
         }
     }
     
@@ -48,19 +48,7 @@ public class Sequoio {
     public void init() {
         Graph<Migration> migrationGraph = changelogParser.parseChangelog();
 
-        migrationApplier.apply(migrationGraph);
-    }
-
-    public void setResourcesDirectory(String resourcesDirectory) {
-        changelogParser.setResourcesDirectory(resourcesDirectory);
-    }
-
-    public void setDefaultSchema(String defaultSchema) {
-        migrationApplier.setDefaultSchema(defaultSchema);
-    }
-
-    public void setDataSource(DataSource dataSource) {
-        migrationApplier.setDataSource(dataSource);
+        migrationApplier.applyMigrationsFromGraph(migrationGraph);
     }
 
 }

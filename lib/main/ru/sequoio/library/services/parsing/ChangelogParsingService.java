@@ -14,48 +14,61 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.sequoio.library.domain.migration.Migration;
 import ru.sequoio.library.domain.graph.Graph;
+import ru.sequoio.library.services.db.application.MigrationApplicationService;
 import ru.sequoio.library.utils.IOUtils;
 
 public class ChangelogParsingService {
 
-    private final static String CONFIG_HEADER = "--sequoio-configuration-file";
+    private final static Logger LOGGER = LoggerFactory.getLogger(MigrationApplicationService.class);
 
-    private String[] classpath;
-    private String sequoioResourcesDirectory;
-    private MigrationParsingService migrationParser;
+    private final static String CONFIG_HEADER = "--sequoio-configuration-file";
+    private static final String CLASS_PATH_PROPERTY = "java.class.path";
+    private static final String CLASS_PATH_SEPARATOR = ":";
+    private static final String SEQUOIO_FILE_EXTENSION = ".seq";
+
+    private final String[] classpath;
+    private final String sequoioResourcesDirectory;
+    private final MigrationParsingService migrationParser;
 
     public ChangelogParsingService(MigrationParsingService migrationParser,
                                    String sequoioResourcesDirectory) {
         this.migrationParser = migrationParser;
-        this.classpath = System.getProperty("java.class.path").split(":");
+        this.classpath = System.getProperty(CLASS_PATH_PROPERTY).split(CLASS_PATH_SEPARATOR);
         this.sequoioResourcesDirectory = sequoioResourcesDirectory;
     }
 
-    /*
-        1. Find all .seq files with correct headers
-        2. Read all .seq files
-            a) Split on migrations
-            b) Parse migrations
+    /**
+     * Finds and reads from classpath all *.seq files with correct headers
+     * Then splits them into migrations and constructs migration graph
      */
     public Graph<Migration> parseChangelog() {
-        AtomicInteger index = new AtomicInteger();
+        LOGGER.debug("Parsing changelog files in directory {} from classpath {}",
+                sequoioResourcesDirectory, Arrays.toString(classpath));
 
+        AtomicInteger index = new AtomicInteger();
         List<Migration> migrations =
-                Arrays.stream(classpath).map(Path::of)
-                .flatMap(p -> resolveResourcesPaths(p, sequoioResourcesDirectory)) // search only in specified 'sequoio config' directory
-                .flatMap(this::listSequoioConfigFilesSafe) // find config files
+                Arrays.stream(classpath)
+                .map(Path::of)
+                .flatMap(this::getResourceDirectories) // search only in specified 'sequoio config' directory
+                .flatMap(this::getSequoioConfigFiles) // find config files in resource directories
                 .distinct() // remove duplicates
-                .filter(this::hasSequoioConfigHeader) // check file header
-                .flatMap(this::parseMigrationFilePaths) // get all migrations
+                .filter(this::hasSequoioConfigHeader) // check file header in config files
+                .flatMap(this::getMigrationFilePaths) // get all migrations paths
                 .flatMap(p -> migrationParser.parseMigrations(p, index)) // parse all migrations in natural order
                 .collect(Collectors.toList());
+
+        LOGGER.debug("Found {} migrations", migrations.size());
 
         return new Graph<>(migrations);
     }
 
-    private Stream<Path> parseMigrationFilePaths(Path path) {
+    private Stream<Path> getMigrationFilePaths(Path path) {
+        LOGGER.debug("Parsing migration file paths in file {}", path);
+
         String dir = path.toFile().getAbsoluteFile().getParent();
         Scanner s = new Scanner(IOUtils.getInputStream(path));
         List<Path> migrationPaths = new ArrayList<>();
@@ -66,6 +79,8 @@ public class ChangelogParsingService {
             }
             migrationPaths.add(Path.of(dir, line));
         }
+
+        LOGGER.debug("Found {} migration file paths for path {}", migrationPaths.size(), path);
         return migrationPaths.stream();
     }
 
@@ -84,52 +99,45 @@ public class ChangelogParsingService {
         }
     }
 
-    private Stream<Path> resolveResourcesPaths(Path path, String maybeInnerFolder) {
-        if (maybeInnerFolder == null) {
+    private Stream<Path> getResourceDirectories(Path path) {
+        LOGGER.debug("Getting resource directories for path {}...", path);
+
+        if (sequoioResourcesDirectory == null) {
+            LOGGER.debug("Found 1 resource directory for path {}", path);
             return Stream.of(path);
         }
-        return listSequoioResourcesDirectoriesSafe(path, maybeInnerFolder);
-    }
 
-    private Stream<Path> listSequoioResourcesDirectoriesSafe(Path path, String sequoioDirectory) {
         try {
-            return listSequoioResourcesDirectories(path, sequoioDirectory);
+            List<Path> result;
+            try (Stream<Path> walk = Files.walk(path)) {
+                result = walk
+                        .filter(Files::isDirectory)
+                        .filter(p -> p.getFileName().endsWith(sequoioResourcesDirectory))
+                        .collect(Collectors.toList());
+            }
+            LOGGER.debug("Found {} resource directories for path {}", result.size(), path);
+            return result.stream();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Stream<Path> listSequoioResourcesDirectories(Path path, String sequoioDirectory) throws IOException {
-        List<Path> result;
-        try (Stream<Path> walk = Files.walk(path)) {
-            result = walk
-                    .filter(Files::isDirectory)
-                    .filter(p -> p.getFileName().endsWith(sequoioDirectory))
-                    .collect(Collectors.toList());
-        }
-        return result.stream();
-    }
+    private Stream<Path> getSequoioConfigFiles(Path path) {
+        LOGGER.debug("Getting config files for path {}...", path);
 
-    private Stream<Path> listSequoioConfigFilesSafe(Path path) {
         try {
-            return listSequoioConfigFiles(path);
+            List<Path> result;
+            try (Stream<Path> walk = Files.walk(path)) {
+                result = walk
+                        .filter(Files::isRegularFile)
+                        .filter(p -> p.getFileName().toString().endsWith(SEQUOIO_FILE_EXTENSION))
+                        .collect(Collectors.toList());
+            }
+            LOGGER.debug("Found {} config files for path {}", result.size(), path);
+            return result.stream();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Stream<Path> listSequoioConfigFiles(Path path) throws IOException {
-        List<Path> result;
-        try (Stream<Path> walk = Files.walk(path)) {
-            result = walk
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().endsWith(".seq"))
-                    .collect(Collectors.toList());
-        }
-        return result.stream();
-    }
-
-    public void setResourcesDirectory(String resourcesDirectory) {
-        this.sequoioResourcesDirectory = resourcesDirectory;
-    }
 }
