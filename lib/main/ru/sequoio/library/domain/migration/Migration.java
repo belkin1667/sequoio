@@ -71,14 +71,16 @@ public class Migration extends Node {
 
     @Override
     public List<String> getExplicitPreviousNodeNames() {
-        return Optional.ofNullable(params.get(MigrationParameter.RUN_AFTER).getValueAsString())
+        return Optional.ofNullable(params.get(MigrationParameter.RUN_AFTER))
+                .map(ParameterValue::getValueAsString)
                 .map(List::of)
                 .orElse(List.of());
     }
 
     @Override
     public List<String> getExplicitNextNodeNames() {
-        return Optional.ofNullable(params.get(MigrationParameter.RUN_BEFORE).getValueAsString())
+        return Optional.ofNullable(params.get(MigrationParameter.RUN_BEFORE))
+                .map(ParameterValue::getValueAsString)
                 .map(List::of)
                 .orElse(List.of());
     }
