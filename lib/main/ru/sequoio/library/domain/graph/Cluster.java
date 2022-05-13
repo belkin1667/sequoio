@@ -1,12 +1,13 @@
 package ru.sequoio.library.domain.graph;
 
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Cluster<T extends Node> implements Comparable<Cluster<T>> {
 
-    private final LinkedList<Node> nodes;
+    private final LinkedList<T> nodes;
     private final Integer order;
 
     public Cluster(T node) {
@@ -14,18 +15,18 @@ public class Cluster<T extends Node> implements Comparable<Cluster<T>> {
         var roots = getRoots(node).collect(Collectors.toList());
         order = roots.stream().map(Node::getNaturalOrder).min(Integer::compareTo).orElse(-1);
 
-        var queue = new LinkedList<>(roots);
+        LinkedList<T> queue = new LinkedList<>(roots);
         while (!queue.isEmpty()) {
-            Node n = queue.poll();
+            T n = queue.poll();
             if (n.isInCluster()) {
-                //throw new IllegalStateException("Cycle found in migration graph!");
+                throw new IllegalStateException("Cycle found in migration graph!");
             }
             addToCluster(n);
-            queue.addAll(n.getNextNodes());
+            queue.addAll((Collection<? extends T>) n.getNextNodes());
         }
     }
 
-    private Stream<Node> getRoots(Node node) {
+    private Stream<T> getRoots(T node) {
         if (node.getPreviousNodes().isEmpty()) {
             return Stream.of(node);
         } else {
@@ -36,11 +37,11 @@ public class Cluster<T extends Node> implements Comparable<Cluster<T>> {
                             throw new IllegalStateException("Cycle found in migration graph!");
                         }
                     })
-                    .flatMap(this::getRoots);
+                    .flatMap(n -> getRoots((T) n));
         }
     }
 
-    private void addToCluster(Node node) {
+    private void addToCluster(T node) {
         nodes.add(node);
         node.markAsInCluster();
     }
@@ -49,7 +50,7 @@ public class Cluster<T extends Node> implements Comparable<Cluster<T>> {
         return order;
     }
 
-    public LinkedList<Node> getNodes() {
+    public LinkedList<T> getNodes() {
         return nodes;
     }
 
