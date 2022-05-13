@@ -6,7 +6,7 @@ public class StringParameterValue implements ParameterValue<String> {
 
     private final String value;
 
-    StringParameterValue(String value) {
+    public StringParameterValue(String value) {
         this.value = value;
     }
 
