@@ -23,7 +23,7 @@ public abstract class ZonkyTest {
     public static EmbeddedPostgres pg;
     public static DataSource dataSource;
     public static boolean autoKillConflictingDatabase = false;
-    public static boolean checkConflictingPostgres = false;
+    public static boolean checkConflictingPostgres = true;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -31,7 +31,9 @@ public abstract class ZonkyTest {
 
         if (checkConflictingPostgres) {
             var runtime = Runtime.getRuntime();
-            var proc = runtime.exec("lsof -PiTCP -sTCP:LISTEN");
+            var proc = runtime.exec(new String[] {
+                    "sh", "-c", String.format("(lsof -PiTCP -sTCP:LISTEN | grep postgres | grep %s)", pgPort)
+            });
             Scanner s = new Scanner(proc.getInputStream());
             while (s.hasNextLine()) {
                 String line = s.nextLine();
