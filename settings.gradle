@@ -1,2 +1,2 @@
 rootProject.name = 'sequoio'
-include('lib')
+include 'lib', 'sandbox'

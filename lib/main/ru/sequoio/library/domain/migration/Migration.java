@@ -101,6 +101,10 @@ public class Migration extends Node {
         return ((BooleanParameterValue) params.get(MigrationParameter.IGNORE)).getValue();
     }
 
+    public Map<String, String> getUserDefinedParams() {
+        return Map.copyOf(userDefinedParams);
+    }
+
     public String getAuthor() {
         return author;
     }
@@ -144,6 +148,7 @@ public class Migration extends Node {
             loggedMigration.setFilename(getPath().toString());
             loggedMigration.setHash(getHash());
             loggedMigration.setRunOrder(getActualOrder());
+            loggedMigration.setUserDefinedParams(getUserDefinedParams());
         }
     }
 

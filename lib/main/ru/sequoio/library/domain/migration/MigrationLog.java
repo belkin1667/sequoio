@@ -1,6 +1,9 @@
 package ru.sequoio.library.domain.migration;
 
 import java.time.Instant;
+import java.util.Map;
+
+import ru.sequoio.library.utils.JsonUtils;
 
 public class MigrationLog {
 
@@ -12,6 +15,7 @@ public class MigrationLog {
     private String filename;
     private String hash;
     private Long runOrder;
+    private String userDefinedParamsJson;
 
     private boolean applied;
 
@@ -23,6 +27,7 @@ public class MigrationLog {
     public static final String filename_ = "filename";
     public static final String hash_ = "hash";
     public static final String runOrder_ = "run_order";
+    public static final String userDefinedParamsJson_ = "user_params";
 
     public MigrationLog(Instant createdAt,
                         Instant lastRunAt,
@@ -31,8 +36,45 @@ public class MigrationLog {
                         String name,
                         String filename,
                         String hash,
-                        Long runOrder
+                        Long runOrder,
+                        Map<String, String> userDefinedParams
     ) {
+        this(createdAt, lastRunAt, runModifier, author, name, filename, hash, runOrder);
+        setUserDefinedParams(userDefinedParams);
+    }
+
+    public MigrationLog(Instant createdAt,
+                        Instant lastRunAt,
+                        String runModifier,
+                        String author,
+                        String name,
+                        String filename,
+                        String hash,
+                        Long runOrder,
+                        String userDefinedParamsJson
+    ) {
+        this(createdAt, lastRunAt, runModifier, author, name, filename, hash, runOrder);
+        this.userDefinedParamsJson = userDefinedParamsJson;
+    }
+
+    public MigrationLog(String runModifier,
+                        String author,
+                        String name,
+                        String filename,
+                        String hash,
+                        Long runOrder,
+                        Map<String, String> userDefinedParams) {
+        this(null, null, runModifier, author, name, filename, hash, runOrder, userDefinedParams);
+    }
+
+    public MigrationLog(Instant createdAt,
+                        Instant lastRunAt,
+                        String runModifier,
+                        String author,
+                        String name,
+                        String filename,
+                        String hash,
+                        Long runOrder) {
         this.createdAt = createdAt;
         this.lastExecutedAt = lastRunAt;
         this.runModifier = runModifier;
@@ -41,10 +83,6 @@ public class MigrationLog {
         this.filename = filename;
         this.hash = hash;
         this.runOrder = runOrder;
-    }
-
-    public MigrationLog(String runModifier, String author, String name, String filename, String hash, Long runOrder) {
-        this(null, null, runModifier, author, name, filename, hash, runOrder);
     }
 
     public String getName() {
@@ -101,5 +139,13 @@ public class MigrationLog {
 
     public void setRunOrder(Long runOrder) {
         this.runOrder = runOrder;
+    }
+
+    public void setUserDefinedParams(Map<String, String> userDefinedParams) {
+        this.userDefinedParamsJson = JsonUtils.mapToJson(userDefinedParams);
+    }
+
+    public String getUserDefinedParamsJson() {
+        return userDefinedParamsJson;
     }
 }
