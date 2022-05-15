@@ -23,22 +23,25 @@ public abstract class ZonkyTest {
     public static EmbeddedPostgres pg;
     public static DataSource dataSource;
     public static boolean autoKillConflictingDatabase = false;
+    public static boolean checkConflictingPostgres = false;
 
     @BeforeEach
     void setUp() throws Exception {
         var pgPort = 54321;
 
-        var runtime = Runtime.getRuntime();
-        var proc = runtime.exec("lsof -PiTCP -sTCP:LISTEN");
-        Scanner s = new Scanner(proc.getInputStream());
-        while (s.hasNextLine()) {
-            String line = s.nextLine();
-            if (line.contains("postgres") && line.contains(String.valueOf(pgPort))) {
-                LOGGER.warn(() -> String.format("Found running postgres database on port %s!", pgPort));
-                if (autoKillConflictingDatabase) {
-                    var pid = line.split(" ")[2];
-                    LOGGER.warn(() -> String.format("Killing conflicting database with pid %s", pid));
-                    runtime.exec(String.format("kill -9 %s", pid));
+        if (checkConflictingPostgres) {
+            var runtime = Runtime.getRuntime();
+            var proc = runtime.exec("lsof -PiTCP -sTCP:LISTEN");
+            Scanner s = new Scanner(proc.getInputStream());
+            while (s.hasNextLine()) {
+                String line = s.nextLine();
+                if (line.contains("postgres") && line.contains(String.valueOf(pgPort))) {
+                    LOGGER.warn(() -> String.format("Found running postgres database on port %s!", pgPort));
+                    if (autoKillConflictingDatabase) {
+                        var pid = line.split(" ")[2];
+                        LOGGER.warn(() -> String.format("Killing conflicting database with pid %s", pid));
+                        runtime.exec(String.format("kill -9 %s", pid));
+                    }
                 }
             }
         }
