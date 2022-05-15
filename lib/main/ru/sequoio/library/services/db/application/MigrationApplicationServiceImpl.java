@@ -3,6 +3,7 @@ package ru.sequoio.library.services.db.application;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,11 +56,48 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     public void applyMigrationsFromGraph(Graph<Migration> migrationGraph) {
         LOGGER.debug("Applying migrations from graph");
         init();
+        setActualOrder(migrationGraph);
+        validateOrder(migrationGraph);
+        tryApplyMigrations(migrationGraph);
+        validateNotAppliedMigrations();
+        terminate();
+    }
 
+    private void validateOrder(Graph<Migration> migrationGraph) {
+        var sortedOldMigrations = migrationGraph.getNodes().stream()
+                .filter(Migration::isNotNew)
+                .sorted(Comparator.comparing(Migration::getActualOrder))
+                .map(Migration::getTitle)
+                .collect(Collectors.toList());
+        var sortedLog = migrationLog.values().stream()
+                .sorted(Comparator.comparing(MigrationLog::getRunOrder))
+                .map(MigrationLog::getName)
+                .collect(Collectors.toList());
+        if (sortedOldMigrations.size() != sortedLog.size()) {
+            throw new IllegalStateException("Failed to apply migrations! " +
+                    "There are possibly deleted migrations");
+        }
+        if (!Objects.deepEquals(sortedOldMigrations, sortedLog)) {
+            throw new IllegalStateException("Migration actual order have changed. " +
+                    "Consider reviewing migrations with 'runBefore' and 'runAfter' parameters");
+        }
+    }
+
+    private void setActualOrder(Graph<Migration> migrationGraph) {
         AtomicLong idx = new AtomicLong(0);
-        migrationGraph.getOrderedNodes().stream()
-                .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
-                .forEach(this::tryApplyMigration);
+        migrationGraph.getOrderedNodes().forEach(migration -> {
+            migration.setActualOrder(idx.getAndIncrement());
+            if (!migrationLog.containsKey(migration.getName())) {
+                migration.setNew();
+            }
+        });
+    }
+
+    private void tryApplyMigrations(Graph<Migration> migrationGraph) {
+        migrationGraph.getOrderedNodes().forEach(this::tryApplyMigration);
+    }
+
+    private void validateNotAppliedMigrations() {
         var notAppliedMigrations = migrationLog.values().stream()
                 .filter(MigrationLog::isNotApplied)
                 .map(Objects::toString)
@@ -68,8 +106,6 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
             throw new IllegalStateException("Failed to apply migrations! " +
                     "There are possibly deleted migrations:\n"  + notAppliedMigrations);
         }
-
-        terminate();
     }
 
     private void init() {

@@ -29,6 +29,7 @@ public class Migration extends Node {
     private RunStatus runStatus;
     private MigrationLog loggedMigration;
     private Long actualOrder;
+    private boolean isNew = false;
 
     private Migration(Path path,
                      Integer naturalOrder,
@@ -162,6 +163,18 @@ public class Migration extends Node {
 
     public boolean isFailOnError() {
         return ((BooleanParameterValue) params.get(MigrationParameter.FAIL_FAST)).getValue();
+    }
+
+    public void setNew() {
+        this.isNew = true;
+    }
+
+    public boolean isNotNew() {
+        return !isNew;
+    }
+
+    public boolean isNew() {
+        return isNew;
     }
 
     public static class MigrationBuilder {
