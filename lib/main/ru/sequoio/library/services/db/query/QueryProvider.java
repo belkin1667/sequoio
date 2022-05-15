@@ -11,11 +11,7 @@ public interface QueryProvider {
     String getUpdateMigrationLogPreparedQuery(String migrationLogTableName);
 
     // Lock queries
-    String getMigrationLogLockExistsQuery();
-    String getCreateMigrationLogLockQuery();
     String getReleaseLockPreparedQuery(String migrationLogLockTableName);
     String getAcquireLockPreparedQuery(String migrationLogLockTableName);
     String getIsLockedPreparedQuery(String migrationLogLockTableName);
-
-    String tryAcquireLockPreparedQuery();
 }

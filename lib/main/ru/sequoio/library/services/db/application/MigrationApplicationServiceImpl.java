@@ -56,21 +56,17 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
         LOGGER.debug("Applying migrations from graph");
         init();
 
-        try {
-            AtomicLong idx = new AtomicLong(0);
-            migrationGraph.getOrderedNodes().stream()
-                    .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
-                    .forEach(this::tryApplyMigration);
-            var notAppliedMigrations = migrationLog.values().stream()
-                    .filter(MigrationLog::isNotApplied)
-                    .map(Objects::toString)
-                    .collect(Collectors.toList());
-            if (notAppliedMigrations.size() > 0) {
-                throw new IllegalStateException("Failed to apply migrations! " +
-                        "There are possibly deleted migrations:\n"  + notAppliedMigrations);
-            }
-        } catch (Exception e) { //todo: удалить к чертям
-            e.printStackTrace();
+        AtomicLong idx = new AtomicLong(0);
+        migrationGraph.getOrderedNodes().stream()
+                .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
+                .forEach(this::tryApplyMigration);
+        var notAppliedMigrations = migrationLog.values().stream()
+                .filter(MigrationLog::isNotApplied)
+                .map(Objects::toString)
+                .collect(Collectors.toList());
+        if (notAppliedMigrations.size() > 0) {
+            throw new IllegalStateException("Failed to apply migrations! " +
+                    "There are possibly deleted migrations:\n"  + notAppliedMigrations);
         }
 
         terminate();
@@ -233,7 +229,8 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
                                 resultSet.getString(MigrationLog.name_),
                                 resultSet.getString(MigrationLog.filename_),
                                 resultSet.getString(MigrationLog.hash_),
-                                resultSet.getLong(MigrationLog.runOrder_)
+                                resultSet.getLong(MigrationLog.runOrder_),
+                                resultSet.getString(MigrationLog.userDefinedParamsJson_)
                         )
                 );
             } while (resultSet.next());
@@ -295,7 +292,8 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
                 migration.getTitle(),
                 migration.getPath().toString(),
                 migration.getHash(),
-                migration.getActualOrder());
+                migration.getActualOrder(),
+                migration.getUserDefinedParams());
 
         try (var conn = dataSource.getConnection()) {
             String query = queryProvider.getInsertMigrationLogQuery(MIGRATION_LOG_TABLE_NAME);
@@ -306,8 +304,9 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
                     migrationLog.getFilename(),
                     migrationLog.getAuthor(),
                     migrationLog.getRunModifier(),
+                    migrationLog.getRunOrder(),
                     migrationLog.getHash(),
-                    migrationLog.getRunOrder()
+                    migrationLog.getUserDefinedParamsJson()
                 ));
             statement.executeUpdate();
         }
@@ -330,7 +329,8 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
                         migrationLog.getRunModifier(),
                         migrationLog.getRunOrder(),
                         migrationLog.getHash(),
-                        migrationLog.getName()
+                        migrationLog.getName(),
+                        migrationLog.getUserDefinedParamsJson()
                     )
             );
             statement.executeUpdate();

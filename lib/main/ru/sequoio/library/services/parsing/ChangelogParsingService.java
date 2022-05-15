@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -110,13 +111,18 @@ public class ChangelogParsingService {
         try {
             List<Path> result;
             try (Stream<Path> walk = Files.walk(path)) {
-                result = walk
+                var w = walk.collect(Collectors.toList());
+                result = w.stream()
                         .filter(Files::isDirectory)
-                        .filter(p -> p.getFileName().endsWith(sequoioResourcesDirectory))
+                        .filter(p -> p.endsWith(sequoioResourcesDirectory))
                         .collect(Collectors.toList());
+
             }
             LOGGER.debug("Found {} resource directories for path {}", result.size(), path);
             return result.stream();
+        } catch (NoSuchFileException ex) {
+            LOGGER.debug("Path {} not found!", path);
+            return Stream.of();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -124,7 +130,9 @@ public class ChangelogParsingService {
 
     private Stream<Path> getSequoioConfigFiles(Path path) {
         LOGGER.debug("Getting config files for path {}...", path);
-
+        if (!Files.exists(path)) {
+            return Stream.of();
+        }
         try {
             List<Path> result;
             try (Stream<Path> walk = Files.walk(path)) {
