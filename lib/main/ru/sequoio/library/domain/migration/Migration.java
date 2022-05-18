@@ -26,10 +26,9 @@ public class Migration extends Node {
     private String body;
     private Map<MigrationParameter, ParameterValue> params;
     private Map<String, String> userDefinedParams;
-    private RunStatus runStatus;
+    private RunStatus runStatus = RunStatus.UNKNOWN;
     private MigrationLog loggedMigration;
     private Long actualOrder;
-    private boolean isNew = false;
 
     private Migration(Path path,
                      Integer naturalOrder,
@@ -165,16 +164,12 @@ public class Migration extends Node {
         return ((BooleanParameterValue) params.get(MigrationParameter.FAIL_FAST)).getValue();
     }
 
-    public void setNew() {
-        this.isNew = true;
-    }
-
     public boolean isNotNew() {
-        return !isNew;
+        return !isNew();
     }
 
     public boolean isNew() {
-        return isNew;
+        return getRunStatus().equals(RunStatus.NEW);
     }
 
     public static class MigrationBuilder {

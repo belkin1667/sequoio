@@ -56,15 +56,17 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     public void applyMigrationsFromGraph(Graph<Migration> migrationGraph) {
         LOGGER.debug("Applying migrations from graph");
         init();
-        setActualOrder(migrationGraph);
-        validateOrder(migrationGraph);
+        setAndValidateActualOrder(migrationGraph);
         tryApplyMigrations(migrationGraph);
         validateNotAppliedMigrations();
         terminate();
     }
 
-    private void validateOrder(Graph<Migration> migrationGraph) {
-        var sortedOldMigrations = migrationGraph.getNodes().stream()
+    private void setAndValidateActualOrder(Graph<Migration> migrationGraph) {
+        AtomicLong idx = new AtomicLong(0);
+        var sortedOldMigrations = migrationGraph.getOrderedNodes().stream()
+                .peek(migration -> migration.setActualOrder(idx.getAndIncrement()))
+                .peek(this::setRunStatusAndMigrationLog)
                 .filter(Migration::isNotNew)
                 .sorted(Comparator.comparing(Migration::getActualOrder))
                 .map(Migration::getTitle)
@@ -81,16 +83,6 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
             throw new IllegalStateException("Migration actual order have changed. " +
                     "Consider reviewing migrations with 'runBefore' and 'runAfter' parameters");
         }
-    }
-
-    private void setActualOrder(Graph<Migration> migrationGraph) {
-        AtomicLong idx = new AtomicLong(0);
-        migrationGraph.getOrderedNodes().forEach(migration -> {
-            migration.setActualOrder(idx.getAndIncrement());
-            if (!migrationLog.containsKey(migration.getName())) {
-                migration.setNew();
-            }
-        });
     }
 
     private void tryApplyMigrations(Graph<Migration> migrationGraph) {
@@ -133,7 +125,6 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
     private void tryApplyMigration(Migration migration) {
         LOGGER.info("[MIGRATION] Processing migration: {}", migration.getName());
         try {
-            setRunStatusAndMigrationLog(migration);
             boolean shouldBeApplied = sieve.sift(migration);
             if (shouldBeApplied) {
                 applyMigration(migration);

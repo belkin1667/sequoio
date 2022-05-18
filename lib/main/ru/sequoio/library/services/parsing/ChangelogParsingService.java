@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -103,18 +104,19 @@ public class ChangelogParsingService {
     private Stream<Path> getResourceDirectories(Path path) {
         LOGGER.debug("Getting resource directories for path {}...", path);
 
-        if (sequoioResourcesDirectory == null) {
-            LOGGER.debug("Found 1 resource directory for path {}", path);
-            return Stream.of(path);
+        if (!Files.isDirectory(path)) {
+            LOGGER.debug("Path {} is not a directory!", path);
+            return Stream.of();
         }
-
+        Predicate<Path> filterPredicate = sequoioResourcesDirectory == null ?
+                Files::isDirectory :
+                p -> Files.isDirectory(p) && p.endsWith(sequoioResourcesDirectory);
         try {
             List<Path> result;
             try (Stream<Path> walk = Files.walk(path)) {
                 var w = walk.collect(Collectors.toList());
                 result = w.stream()
-                        .filter(Files::isDirectory)
-                        .filter(p -> p.endsWith(sequoioResourcesDirectory))
+                        .filter(filterPredicate)
                         .collect(Collectors.toList());
 
             }
