@@ -10,8 +10,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -65,7 +67,22 @@ public class ChangelogParsingService {
 
         LOGGER.debug("Found {} migrations", migrations.size());
 
+        assertUniqueNames(migrations);
+
         return new Graph<>(migrations);
+    }
+
+    private void assertUniqueNames(List<Migration> migrations) {
+        var duplicates = migrations.stream().map(Migration::getTitle)
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+                .entrySet()
+                .stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        if (duplicates.size() > 0) {
+            throw new IllegalStateException(String.format("Found duplicate migration names: %s", duplicates));
+        }
     }
 
     private Stream<Path> getMigrationFilePaths(Path path) {

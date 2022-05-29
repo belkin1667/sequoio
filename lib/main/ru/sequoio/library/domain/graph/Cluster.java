@@ -13,7 +13,7 @@ public class Cluster<T extends Node> implements Comparable<Cluster<T>> {
     public Cluster(T node) {
         nodes = new LinkedList<>();
         var roots = getRoots(node).collect(Collectors.toList());
-        order = roots.stream().map(Node::getNaturalOrder).min(Integer::compareTo).orElse(-1);
+        //order = roots.stream().map(Node::getNaturalOrder).min(Integer::compareTo).orElse(-1);
 
         LinkedList<T> queue = new LinkedList<>(roots);
         while (!queue.isEmpty()) {
@@ -24,6 +24,7 @@ public class Cluster<T extends Node> implements Comparable<Cluster<T>> {
             addToCluster(n);
             queue.addAll((Collection<? extends T>) n.getNextNodes());
         }
+        order = nodes.stream().map(Node::getNaturalOrder).min(Integer::compareTo).orElse(-1);
     }
 
     private Stream<T> getRoots(T node) {
