@@ -11,7 +11,7 @@ public class Main {
 
     public static void main(String[] args) {
         Sequoio sequoio = new Sequoio(
-                "migrations/demo",
+                "migrations/defence_copy",
                 "production",
                 "public",
                 getDataSource(),

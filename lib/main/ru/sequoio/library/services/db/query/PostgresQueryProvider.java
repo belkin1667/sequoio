@@ -48,8 +48,8 @@ public class PostgresQueryProvider implements QueryProvider {
                     "    %s = ?, " +
                     "    %s = ?, " +
                     "    %s = ?, " +
-                    "    %s = ? " +
-                    "    %s = ?::JSON " +
+                    "    %s = ?, " +
+                    "    %s = ?::jsonb " +
                     "where %s = ?;",
                 migrationLogTableName,
                 MigrationLog.lastExecutedAt_,

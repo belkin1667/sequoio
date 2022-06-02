@@ -1,0 +1,3 @@
+--sequoio-configuration-file
+tables/users.sql
+tables/cars.sql

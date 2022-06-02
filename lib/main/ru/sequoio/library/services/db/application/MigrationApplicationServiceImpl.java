@@ -128,12 +128,12 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
             boolean shouldBeApplied = sieve.sift(migration);
             if (shouldBeApplied) {
                 applyMigration(migration);
-                if (migration.getLoggedMigration() != null) {
-                    updateMigrationLog(migration);
-                }
-                else {
-                    addMigrationLog(migration);
-                }
+            }
+            if (migration.getLoggedMigration() != null) {
+                updateMigrationLog(migration);
+            }
+            else {
+                addMigrationLog(migration);
             }
             migration.getLoggedMigration().setApplied();
         } catch (SQLException e) {
@@ -356,8 +356,8 @@ public class MigrationApplicationServiceImpl implements MigrationApplicationServ
                         migrationLog.getRunModifier(),
                         migrationLog.getRunOrder(),
                         migrationLog.getHash(),
-                        migrationLog.getName(),
-                        migrationLog.getUserDefinedParamsJson()
+                        migrationLog.getUserDefinedParamsJson(),
+                        migrationLog.getName()
                     )
             );
             statement.executeUpdate();
